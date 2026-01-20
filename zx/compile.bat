@@ -1,0 +1,1 @@
+zcc +zx -compiler=sccz80 -lndos -create-app view16.c car16.c -o view16

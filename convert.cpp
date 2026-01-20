@@ -114,10 +114,8 @@ void Convert(const std::string& input_file, const std::string& project, const in
     unsigned cg = 0;
 
     std::vector<RGB> vec_pal;
-    std::vector<unsigned> vec_attrib;
     vec_pal.resize(768*2);
-    vec_attrib.resize(768 * 2);
- 
+
 
     cv::Mat outzx(192, ZX_SIZE_X, CV_8UC3, cv::Scalar(0, 0, 0));
 
@@ -167,7 +165,7 @@ void Convert(const std::string& input_file, const std::string& project, const in
                     _ASSERT(indx < 768 * 2);
                     //vec_pal[indx] = ToRGB(Expand(avail_palette_16[it_s->second.entry_indx])); // NOT it_s->second.rgb;
                     vec_pal[indx] = it_s->second.rgb;
-                    vec_attrib[indx] = it_s->second.entry_indx;
+                    //vec_attrib[indx] = it_s->second.entry_indx;
                     k++;
                     std::cout << "*";
                     arleady_avail.insert(it_s->second.rgb);
@@ -180,7 +178,7 @@ void Convert(const std::string& input_file, const std::string& project, const in
             {
                 auto indx = pal_indx_base + k;
                 _ASSERT(indx < 768 * 2);
-                vec_pal[indx] = *arleady_avail.begin();
+                vec_pal[indx] = RGB{}; //*arleady_avail.begin();
                 k++;
             }
 
@@ -189,8 +187,7 @@ void Convert(const std::string& input_file, const std::string& project, const in
                 for (int c1 = 0; c1 < saver->ColsInGroup() && (c + c1) < ZX_SIZE_X && (c + c1) < outsc.cols; c1++)
                 {
                     const auto& p = outsc.at<cv::Vec3b>(r + r1, c + c1);
-                    
-                    
+ 
                     auto best = saver->CodePixel(r + r1, c + c1, p, vec_pal, pal_indx_base);
 
                     outzx.at<cv::Vec3b>(r+r1, c+c1) = best;
@@ -202,45 +199,40 @@ void Convert(const std::string& input_file, const std::string& project, const in
         rg++;
     }
  
-    std::ofstream ofm{ std::string(input_file).append(".h") };
-    //ofm << "#define " << argv[2] << "col0 0x" << *col_global0_indx << std::endl;
-    //ofm << "#define " << argv[2] << "rgb0 0x" << (int)Pack(rgb_most_popular) << std::endl;
-    //ofm << "#define " << argv[2] << "col3 0x" << *col_global1_indx << std::endl;
+    auto fn_base = input_file;
+    auto pos_bsh = input_file.find_last_of('\\');
+    if (pos_bsh != std::string::npos)
+    {
+        fn_base = input_file.substr(0, pos_bsh+1);
+        fn_base += project;
+    }
 
-    //ofm << "extern void " << argv[2] << "_show() __banked;" << std::endl;
-    //ofm.close();
+    std::stringstream ss;
+    ss << fn_base << output_mode << ".h";
 
-    //ofm.open(std::string(input_file).append(".c"), std::ios::trunc);
-    // ofm << "#pragma bank ?" << std::endl;
-    /*
-    ofm << "#include \"" << project << ".h\"" << std::endl;
-    ofm << "#include <string.h>" << std::endl;
-    ofm << "const char " << argv[2] << "_page_0[] = {" << std::hex << std::endl;
-    saver->Save(ofm, 0);
-    ofm << "};" << std::endl;
-    ofm << "const char " << argv[2] << "_page_1[] = {" << std::hex << std::endl;
-    saver->Save(ofm, 1);
-    ofm << "};" << std::endl;
-    saver->SavePaletteAsAtributes(ofm, vec_pal, argv[2]);
-
-    ofm << "void " << argv[2] << "_show()" << std::endl;
-    ofm << "{" << std::endl;
-    ofm << "    memcpy((void*)0x5800, " << argv[2] << "_attribs0, 768);" << std::endl;
-    ofm << "    memcpy((void*)0x7800, " << argv[2] << "_attribs1, 768);" << std::endl;
-    ofm << "    memcpy((void*)0x4000, " << argv[2] << "_page_0, 6144);" << std::endl;
-    ofm << "    memcpy((void*)0x6000, " << argv[2] << "_page_1, 6144);" << std::endl;
-    ofm << "}" << std::endl;
+    std::ofstream ofm{ ss.str()};
+    saver->SaveHeader(ofm, project);
     ofm.close();
-    */
+
+    ss.str("");
+    ss << fn_base << output_mode << ".c";
+
+    ofm.open(ss.str(), std::ios::trunc);
+    saver->SaveCFile(ofm, project, vec_pal);
+
+    ofm.close();
+    
     cv::Mat imzx;
     cv::resize(outzx, imzx, cv::Size(), ZX_SIZE_X < 256 ? 8 : 4, 4);
-    auto fnamezx = std::string(input_file).append("_zx.bmp");
-    cv::imwrite(fnamezx, outzx);
+    ss.str("");
+    ss << fn_base << output_mode << "_zx.bmp";
+    cv::imwrite(ss.str(), outzx);
 
     cv::Mat im;
     cv::resize(outsc, im, cv::Size(), ZX_SIZE_X < 256 ? 8 : 4, 4);
-    auto fname = std::string(input_file).append(".bmp");
-    cv::imwrite(fname, in);
+    ss.str("");
+    ss << fn_base << output_mode << "_preview.bmp";;
+    cv::imwrite(ss.str(), in);
     cv::imshow(input_file, im);
     cv::imshow("zx", imzx);
 
@@ -250,10 +242,24 @@ void Convert(const std::string& input_file, const std::string& project, const in
 
 int main(int argc, char* argv[])
 {
-    if (argc < 3)
+    if (argc < 4)
+    {
+        std::cerr << "Usage: " << argv[0] << " file_path project_name color mode (4 or 16)" << std::endl;
         return -1;
+    }
 
     // 4 or 16 colors
-    const int output_mode = 16;
+    unsigned output_mode = 0;
+    try
+    {
+        output_mode = std::stoi(argv[3]);
+        if (output_mode != 4 and output_mode != 16)
+            throw std::out_of_range("");
+    }
+    catch (const std::exception&)
+    {
+        std::cerr << "Output mode ca be only 4 or 16" << std::endl;
+    }
+
     Convert(argv[1], argv[2], output_mode);
 }

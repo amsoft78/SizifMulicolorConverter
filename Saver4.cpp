@@ -191,6 +191,22 @@ std::set<RGB> Saver4::UsePrevPaletteEntries(const std::vector<RGB>& /*pal_rgb*/,
     return arleady_avail;
 }
 
+void Saver4::SaveHeader(std::ofstream& of, const std::string& project)
+{
+    of << "#define " << project << "col0 0x" << *_g.col_global0_indx << std::endl;
+    of << "#define " << project << "rgb0 0x" << (int)Pack(*_g.col_global0_rgb) << std::endl;
+    of << "#define " << project << "col3 0x" << *_g.col_global1_indx << std::endl;
+
+    of << "extern void " << project << "_show() __banked;" << std::endl;
+}
+
+void Saver4::SaveCFile(std::ofstream& of, const std::string& project, const std::vector<RGB>& attribs)
+{
+    std::string fullname = project + "4";
+    Saver::SaveCFile(of, fullname, attribs);
+}
+
+/*
 void Saver4::SavePalette(std::ofstream& of, const std::vector<RGB> pal, const std::string& prefix, const RGB* others) const
 {
     unsigned zx_pal[48];
@@ -225,5 +241,7 @@ void Saver4::SavePalette(std::ofstream& of, const std::vector<RGB> pal, const st
     }
     of << "};" << std::endl;
 }
+
+*/
 
 

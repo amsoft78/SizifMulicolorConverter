@@ -18,77 +18,8 @@ Saver::~Saver()
     delete[] out_page1;
 }
 
-/* VERSION WITH COMPRESSSION
-void Saver::Save(std::ofstream& of, unsigned page) const
-{
-    uchar* data = (page == 1) ? out_page1 : out_page0;
-    unsigned i = 0;
-    unsigned maxi = 192 * 32;
-    unsigned lin_items = 0;
-    std::map<uchar, unsigned> prefixes;
-    
-    uchar prefix_mask = 0xE0;
-    uchar max_rep = ~prefix_mask + 1;
 
-    for (i = 0; i < maxi; i++)
-    {
-        uchar curr = data[i];
-        uchar pref = prefix_mask & curr;
-        prefixes[pref]++;
-    }
-    std::map<unsigned, uchar> rev_prefixes;
-    for (const auto& el : prefixes)
-    {
-        rev_prefixes[el.second] = el.first;
-    }
-    std::cout << rev_prefixes.begin()->first << " : " << std::hex << (int) rev_prefixes.begin()->second << std::dec << std::endl;
-    
-    auto choosen_prefix = rev_prefixes.begin()->second;
-    of << "0x" << (unsigned)prefix_mask;
-    of << ", 0x" << (unsigned)choosen_prefix;
-    i = 0;
-    int output_count = 0;
-    while (i < maxi)
-    {
-        // check data receptibility
-        uchar curr = data[i];
-        unsigned rep = 1;
-        while (i + rep < maxi && rep < max_rep && data[i + rep] == curr)
-            rep++;
-        // 0b11xxxxxx must be stored that way anyway
-        if (rep > 2 || ((curr & prefix_mask) == choosen_prefix))
-        {
-            of << ", 0x" << (choosen_prefix | (rep - 1));
-            of << ", 0x" << (unsigned)curr;
-            lin_items++;
-            i += rep;
-            output_count += 2;
-        }
-        else
-        {
-            of << ", 0x" << (unsigned)curr;
-            i++;
-            output_count++;
-        }
-        if (i < maxi - 1)
-        {
-            lin_items++;
-            if (lin_items > 20)
-            {
-                of << std::endl;
-                lin_items = 0;
-            }
-        }
-        else
-        {
-            of << std::endl;
-        }
-    }
-    std::cout << "Compressed data size: " << output_count << " for " << 256 * 192 / 8 << std::endl;
-}
-*/
-
-void Saver::Save(std::ofstream& of, unsigned page) const
+void Saver::SaveScreenPage(std::ofstream& of, unsigned page) const
 {
     uchar* data = (page == 1) ? out_page1 : out_page0;
     unsigned i = 0;
@@ -120,7 +51,28 @@ void Saver::Save(std::ofstream& of, unsigned page) const
     }
 }
 
+void Saver::SaveCFile(std::ofstream& of, const std::string& project, const std::vector<RGB>& attribs)
+{
+    of << "#pragma bank ?" << std::endl;
 
+    of << "#include \"" << project << ".h\"" << std::endl;
+    of << "#include <string.h>" << std::endl;
+    of << "const char " << project << "_page_0[] = {" << std::hex << std::endl;
+    SaveScreenPage(of, 0);
+    of << "};" << std::endl;
+    of << "const char " << project << "_page_1[] = {" << std::hex << std::endl;
+    SaveScreenPage(of, 1);
+    of << "};" << std::endl;
+    SavePaletteAsAtributes(of, attribs, project);
+
+    of << "void " << project << "_show()" << std::endl;
+    of << "{" << std::endl;
+    of << "    memcpy((void*)0x5800, " << project << "_attribs0, 768);" << std::endl;
+    of << "    memcpy((void*)0x7800, " << project << "_attribs1, 768);" << std::endl;
+    of << "    memcpy((void*)0x4000, " << project << "_page_0, 6144);" << std::endl;
+    of << "    memcpy((void*)0x6000, " << project << "_page_1, 6144);" << std::endl;
+    of << "}" << std::endl;
+}
 
 void Saver::SavePaletteAsAtributes(std::ofstream& of,
     const std::vector<RGB>& attribs,
@@ -149,6 +101,3 @@ void Saver::SavePaletteAsAtributes(std::ofstream& of,
         of << "};" << std::endl;
     }
 }
-
-
- 

@@ -9,8 +9,6 @@ public:
 
     virtual GlobalStat AnalyzeGlobal(const cv::Vec3b* avail_paletteTC, const cv::Mat& in) override;
 
-    virtual void PutPixel(unsigned row, unsigned col, unsigned val) override;
-
     virtual cv::Vec3b CodePixel(unsigned row, unsigned col,
         const cv::Vec3b& in,
         const std::vector<RGB>& pal_rgb,
@@ -34,9 +32,13 @@ public:
         unsigned pal_indx_base,
         unsigned current_column) const override;
 
-    virtual void SavePalette(std::ofstream& of, const std::vector<RGB> pal, const std::string& prefix, const RGB* others) const override;
+    virtual void SaveHeader(std::ofstream& of, const std::string& project) override;
+    virtual void SaveCFile(std::ofstream& of, const std::string& project, const std::vector<RGB>& attribs) override;
 
 private:
     GlobalStat _g;
+
+    virtual void PutPixel(unsigned row, unsigned col, unsigned val) override;
+    //virtual void SavePalette(std::ofstream& of, const std::vector<RGB> pal, const std::string& prefix, const RGB* others) const override;
 };
 

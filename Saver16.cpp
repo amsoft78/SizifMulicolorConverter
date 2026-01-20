@@ -1,22 +1,34 @@
 #include "Saver16.h"
 #include "Nearest.h"
+#include "PaletteStatistics.h"
 #include <fstream>
 #include <iostream>
 
 Saver16::Saver16(const uchar* avail_zx_palette_as_rgb)
     : Saver(avail_zx_palette_as_rgb)
 {
-   _nearest12 = std::make_unique<Nearest> (_zx_palette, nullptr, 
-       std::set<unsigned>{0b0001 , 0b0101, 0b1000, 0b1100 } );
+    _nearest12 = std::make_unique<Nearest>(_zx_palette, nullptr,
+        std::set<unsigned>{0b0001, 0b0101, 0b1000, 0b1100 } );
 }
 
 Saver16::~Saver16()
 {
 }
 
-GlobalStat Saver16::AnalyzeGlobal(const cv::Vec3b*, const cv::Mat&)
+GlobalStat Saver16::AnalyzeGlobal(const cv::Vec3b*, const cv::Mat& in)
 {
-    // nothing to do
+    auto nearest_low = Nearest{ _zx_palette, nullptr, {8, 9, 10, 11, 12, 13, 14, 15} };
+
+    PaletteStatistics ps{ unsigned(in.cols), (unsigned)in.rows,
+                    in,
+                    nearest_low, 0, 0 };
+    auto& rev_col_map_low = ps.GetStat();
+    auto it_s = rev_col_map_low.rbegin();
+    if (it_s != rev_col_map_low.rend())
+    {
+        _border_color = it_s->second.entry_indx;
+    }
+    // nothing to return
     return GlobalStat();
 }
 
@@ -48,7 +60,7 @@ cv::Vec3b Saver16::CodePixel(unsigned row, unsigned col,
     unsigned pal_indx_base)
 {
     auto nearest_native = _nearest12->GetNearest(p);
-    // start of the avalaible entries. we can use two previous colors because of event/odd overlaping
+    // start of the available entries. we can use two previous colors because of event/odd overlapping
     unsigned start_palette = pal_indx_base;
     unsigned entries_to_check = 2;
     if (col >= 4 && pal_indx_base >= 2)
@@ -67,17 +79,17 @@ cv::Vec3b Saver16::CodePixel(unsigned row, unsigned col,
     {
         auto code = nearest_palette.indx;
         // re-code because of shifting!!!! odds/even column fours
-        //if ((col & 0x04) && entries_to_check > 2)
-        //    code = code ^ 0x2;
+        if ((col % 8) < 4 && col >= 8)
+            code = code ^ 0x2;
         switch (code)
         {
         case 0b00:
             zx_col = 0b0001;
             break;
-        case 0b01:
+        case 0b10:
             zx_col = 0b0101;
             break;
-        case 0b10:
+        case 0b01:
             zx_col = 0b1000;
             break;
         case 0b11:
@@ -88,6 +100,7 @@ cv::Vec3b Saver16::CodePixel(unsigned row, unsigned col,
         }
         out_pixel_color = Expand(pal_rgb[start_palette + nearest_palette.indx]);
     }
+    PutPixel(row, col, zx_col);
 
     return out_pixel_color;
 }
@@ -102,47 +115,44 @@ std::set<RGB> Saver16::UsePrevPaletteEntries(const std::vector<RGB>& pal_rgb, un
     return arleady_avail;
 }
 
-void Saver16::SavePalette(std::ofstream& of, const std::vector<RGB> pal, const std::string& prefix, const RGB* others) const
+void Saver16::SaveHeader(std::ofstream& of, const std::string& project)
+{
+    of << "#define " << project << "16col0 0x" << _border_color << std::endl;
+ 
+    of << "extern void " << project << "16_show() __banked;" << std::endl;
+}
+
+void Saver16::SaveCFile(std::ofstream& of, const std::string& project, const std::vector<RGB>& attribs)
+{
+    std::string fullname = project + "16";
+    Saver::SaveCFile(of, fullname, attribs);
+}
+
+void Saver16::SavePaletteAsAtributes(std::ofstream& of, const std::vector<RGB>& attribs, const std::string& prefix) const
+{
+    for (unsigned page = 0; page <= 1; page++)
     {
-        unsigned zx_pal[64];
-        if (others)
+        of << "const char " << prefix << "_attribs" << page << "[] = {" << std::hex << std::endl;
+        // there are four numbers for each entry!, unpack it.
+        for (unsigned row = 0; row < 24; row++)
         {
-            for (unsigned i = 0; i < 8; i++)
-            zx_pal[i+8] = Pack(others[i]);
-        }
-        for (unsigned i = 0; i < 48; i++)
-        {
-            // addressing bits are swapped, bit 3 swaps ink / paper
-            // 00ccPeee cc -> clutch, eee-entry 
-            // in this solution entry bit 1 is in bit 3, entry bit 0 is in bit 0
-            unsigned in_grp = i >> 2;
-
-            // groups of 8 lines are negative, so the sections are in order 11, 10, 01. Section 0 holds only border color!
-            unsigned in_grpH = ~(in_grp >> 2 ) & 0b0011; // (in_grp & 0b1100) >> 2;
-            unsigned in_grpL = in_grp & 0b0011;
-            unsigned H = 0 == ((i & 0b0010) >> 1);
-            unsigned L = i & 0b0001;
-           
-            unsigned indx = (in_grpH << 4) | (H << 3) | (in_grpL << 1) | L;
-            const auto& c = pal[i];
-            unsigned char entry = Pack(c);
-            _ASSERT(indx > 7 && indx <= 63);
-            zx_pal[indx] = entry;
-        }
-        of << "const char " << prefix << "_palette[] = {" << std::hex << std::endl;
-
-        for (unsigned i = 0; i < 4; i++)
-        {
-            for (unsigned j = 0; j < 16; j++)
+            for (unsigned col = 0; col < 32; col += 1)
             {
-                if (j != 0 || i != 0)
+                auto indx = page == 1 ?
+                    (row * 32 + col) * 2 :
+                    (row * 32 + col) * 2 + 1;
+                std::cerr << indx << "\t";
+                const auto& rgb = attribs[indx];
+                auto packed = Pack(rgb);
+                of << "0x" << (int)(packed);
+                if (row != 23 || col != 31)
                     of << ", ";
-                of << "0x" << (int)((unsigned char)zx_pal[i * 16 + j]);
-
             }
+            std::cerr << std::endl;
             of << std::endl;
         }
         of << "};" << std::endl;
     }
 
+}
 
