@@ -27,6 +27,7 @@ GlobalStat Saver16::AnalyzeGlobal(const cv::Vec3b*, const cv::Mat& in)
     if (it_s != rev_col_map_low.rend())
     {
         _border_color = it_s->second.entry_indx;
+        _border_rgb = it_s->second.rgb;
     }
     // nothing to return
     return GlobalStat();
@@ -108,6 +109,16 @@ cv::Vec3b Saver16::CodePixel(unsigned row, unsigned col,
 std::set<RGB> Saver16::UsePrevPaletteEntries(const std::vector<RGB>& pal_rgb, unsigned pal_indx_base, unsigned current_column) const
 {
     std::set<RGB> arleady_avail;
+
+    std::set<unsigned> substituted_palette_entries = { 0b0001, 0b0101, 0b1000, 0b1100 };
+    // can use 12 of 16 native colors
+    for (unsigned i = 0; i < 16; i++)
+    {
+        if (substituted_palette_entries.find(i) == substituted_palette_entries.cend())
+            arleady_avail.insert(ToRGB(Expand(_zx_palette[i])));
+    }
+
+    // can usetwo previously defined colors
     if (current_column < 4)
         return arleady_avail;
     arleady_avail.insert(pal_rgb[pal_indx_base - 1]);
@@ -115,9 +126,17 @@ std::set<RGB> Saver16::UsePrevPaletteEntries(const std::vector<RGB>& pal_rgb, un
     return arleady_avail;
 }
 
+bool Saver16::CanUseNativeZXEntry(unsigned zx_color)
+{
+    // not-substituted palete entries can be used directly 
+    std::set<unsigned> substituted_palette_entries = { 0b0001, 0b0101, 0b1000, 0b1100 };
+    return substituted_palette_entries.find(zx_color) == substituted_palette_entries.cend();
+}
+
 void Saver16::SaveHeader(std::ofstream& of, const std::string& project)
 {
     of << "#define " << project << "16col0 0x" << _border_color << std::endl;
+    of << "#define " << project << "16rgb0 0x" << (int)Pack(_border_rgb) << std::endl;
  
     of << "extern void " << project << "16_show() __banked;" << std::endl;
 }
@@ -126,33 +145,5 @@ void Saver16::SaveCFile(std::ofstream& of, const std::string& project, const std
 {
     std::string fullname = project + "16";
     Saver::SaveCFile(of, fullname, attribs);
-}
-
-void Saver16::SavePaletteAsAtributes(std::ofstream& of, const std::vector<RGB>& attribs, const std::string& prefix) const
-{
-    for (unsigned page = 0; page <= 1; page++)
-    {
-        of << "const char " << prefix << "_attribs" << page << "[] = {" << std::hex << std::endl;
-        // there are four numbers for each entry!, unpack it.
-        for (unsigned row = 0; row < 24; row++)
-        {
-            for (unsigned col = 0; col < 32; col += 1)
-            {
-                auto indx = page == 1 ?
-                    (row * 32 + col) * 2 :
-                    (row * 32 + col) * 2 + 1;
-                std::cerr << indx << "\t";
-                const auto& rgb = attribs[indx];
-                auto packed = Pack(rgb);
-                of << "0x" << (int)(packed);
-                if (row != 23 || col != 31)
-                    of << ", ";
-            }
-            std::cerr << std::endl;
-            of << std::endl;
-        }
-        of << "};" << std::endl;
-    }
-
 }
 

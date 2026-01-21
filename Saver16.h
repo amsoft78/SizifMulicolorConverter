@@ -41,15 +41,14 @@ public:
         unsigned pal_indx_base,
         unsigned current_column) const override;
 
+    virtual bool CanUseNativeZXEntry(unsigned) override;
+
     virtual void SaveHeader(std::ofstream& of, const std::string& project) override;
     virtual void SaveCFile(std::ofstream& of, const std::string& project, const std::vector<RGB>& attribs) override;
 
 private:
     std::unique_ptr<Nearest> _nearest12;
     unsigned _border_color{ 0 };
-
-    virtual void SavePaletteAsAtributes(std::ofstream& of,
-        const std::vector<RGB>& attribs,
-        const std::string& prefix) const override;
+    RGB _border_rgb;
 };
 

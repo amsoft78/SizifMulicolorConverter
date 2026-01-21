@@ -32,6 +32,11 @@ public:
         unsigned pal_indx_base,
         unsigned current_column) const override;
 
+    virtual bool CanUseNativeZXEntry(unsigned) override
+    {
+        return false; /// in CGA4 no 16 colors palette entries are used directly
+    }
+
     virtual void SaveHeader(std::ofstream& of, const std::string& project) override;
     virtual void SaveCFile(std::ofstream& of, const std::string& project, const std::vector<RGB>& attribs) override;
 
@@ -39,6 +44,5 @@ private:
     GlobalStat _g;
 
     virtual void PutPixel(unsigned row, unsigned col, unsigned val) override;
-    //virtual void SavePalette(std::ofstream& of, const std::vector<RGB> pal, const std::string& prefix, const RGB* others) const override;
 };
 

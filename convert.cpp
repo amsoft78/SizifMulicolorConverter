@@ -119,6 +119,8 @@ void Convert(const std::string& input_file, const std::string& project, const in
 
     cv::Mat outzx(192, ZX_SIZE_X, CV_8UC3, cv::Scalar(0, 0, 0));
 
+    unsigned free_prev_palette_items{ 0 }; // if prevoius group did not generate both entries, it might be used by next group
+
     for (unsigned r = 0; r < outsc.rows && r < 192; r += saver->RowsInGroup())
     {
         cg = 0;
@@ -142,7 +144,8 @@ void Convert(const std::string& input_file, const std::string& project, const in
             std::set<RGB> arleady_avail = saver->UsePrevPaletteEntries(vec_pal, pal_indx_base, c);
 
             auto it_s = rev_col_map.rbegin();
-            unsigned k = 0;
+            int to_fill = 2 + free_prev_palette_items;
+            int insert_cout{ 0 };
             for (;
                 (it_s != rev_col_map.rend());
                 ++it_s)
@@ -158,28 +161,26 @@ void Convert(const std::string& input_file, const std::string& project, const in
                     << ", COL: 0x" << ((it_s->second.rgb.g << 5) + (it_s->second.rgb.r << 2) + it_s->second.rgb.b)
                     << std::dec
                     << ", ZX color " << it_s->second.entry_indx << ", dist " << it_s->second.entry_distance;
-                    
-                if (k < 2)
+                if (to_fill > 0 && !(it_s->second.entry_distance == 0 && saver->CanUseNativeZXEntry(it_s->second.entry_indx) ))
                 {
-                    auto indx = pal_indx_base + k;
+                    auto indx = pal_indx_base - free_prev_palette_items + to_fill - 1;
                     _ASSERT(indx < 768 * 2);
-                    //vec_pal[indx] = ToRGB(Expand(avail_palette_16[it_s->second.entry_indx])); // NOT it_s->second.rgb;
                     vec_pal[indx] = it_s->second.rgb;
-                    //vec_attrib[indx] = it_s->second.entry_indx;
-                    k++;
+                    to_fill--;
                     std::cout << "*";
                     arleady_avail.insert(it_s->second.rgb);
+                    insert_cout++;
+                    if (insert_cout > 2)
+                        std::cout << "***";
                 }
+
                 std::cout << std::endl;
             }
 
-            // fill the unused entries with already known value
-            while (k < 2 && arleady_avail.size())
+            // allow use not filled entries by a next colour group
+            if (to_fill > 1)
             {
-                auto indx = pal_indx_base + k;
-                _ASSERT(indx < 768 * 2);
-                vec_pal[indx] = RGB{}; //*arleady_avail.begin();
-                k++;
+                //free_prev_palette_items = std::min(to_fill, 2);
             }
 
             for (int r1 = 0; r1 < saver->RowsInGroup() && (r + r1) < 192 && (r + r1) < outsc.rows; r1++)

@@ -18,6 +18,8 @@ public:
         unsigned pal_indx_base,
         unsigned current_column) const = 0;
 
+    virtual bool CanUseNativeZXEntry(unsigned) = 0; // if saver can use matched ZX palette id directly
+
     virtual void SaveHeader(std::ofstream& of, const std::string& project) = 0;
     virtual void SaveCFile(std::ofstream& of, const std::string& project, const std::vector<RGB>& attribs);
 
