@@ -37,9 +37,15 @@ public:
         return 8;
     }
 
+    virtual unsigned ScreenColumns() const override
+    {
+        return 128;
+    }
+
     virtual std::set<RGB> UsePrevPaletteEntries(const std::vector<RGB>& pal_rgb,
         unsigned pal_indx_base,
-        unsigned current_column) const override;
+        unsigned current_column,
+        unsigned current_row) const override;
 
     virtual bool CanUseNativeZXEntry(unsigned) override;
 

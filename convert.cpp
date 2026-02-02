@@ -11,13 +11,20 @@
 #include "PaletteStatistics.h"
 #include "Saver4.h"
 #include "Saver16.h"
+#include "SaverDual.h"
 
 #include <optional>
 #include <bitset>
 #include "C64.h"
 
+enum class OutputMode
+{
+    cga4,
+    cga16,
+    dual_playfield
+};
 
-void Convert(const std::string& input_file, const std::string& project, const int output_mode)
+void Convert(const std::string& input_file, const std::string& project, const OutputMode output_mode)
 {
     //ColorInfo col_info[16];
     const auto avail_palette_16 = spectrum_more_rg;
@@ -37,8 +44,30 @@ void Convert(const std::string& input_file, const std::string& project, const in
     
     cv::Mat in;
 
+    std::unique_ptr<Saver> saver;
+    std::string output_mode_prefix;
 
-    const int ZX_SIZE_X = output_mode == 16  ? 128 : 256;
+    if (output_mode == OutputMode::cga16)
+    {
+        saver = std::make_unique <Saver16>(avail_palette_16);
+        output_mode_prefix = "16";
+    }
+    else
+        if (output_mode == OutputMode::cga4)
+        {
+            saver = std::make_unique <Saver4>(avail_palette_16);
+            output_mode_prefix = "4";
+        }
+        else
+            if (output_mode == OutputMode::dual_playfield)
+            {
+                saver = std::make_unique <SaverDual>(avail_palette_16);
+                output_mode_prefix = "dp";
+            }
+            else
+                return;
+
+    const int ZX_SIZE_X = saver->ScreenColumns();
     bool is_commodore{ false };
     // determine file type
 
@@ -55,20 +84,6 @@ void Convert(const std::string& input_file, const std::string& project, const in
         // openCV auto file load
         in = cv::imread(input_file, cv::IMREAD_COLOR);
     }
-
-    bool need_global = output_mode == 4;
-
-    std::unique_ptr<Saver> saver;
-
-    if (output_mode == 16)
-        saver = std::make_unique <Saver16>(avail_palette_16);
-    else
-        if (output_mode == 4)
-            saver = std::make_unique <Saver4>(avail_palette_16);
-        else
-            return;
-
-    GlobalStat gs = saver->AnalyzeGlobal(avail_paletteTC, in);
 
 
     cv::Mat outsc(ZX_SIZE_X, 192, CV_8UC3, cv::Scalar(0, 0, 0)); // TODO - use most popular color!
@@ -97,7 +112,6 @@ void Convert(const std::string& input_file, const std::string& project, const in
     cv::resize(in, in, cv::Size{}, factor, factor_y);
 
     // cut from the middle from wider images
-    // cut from the middle from wider images
     int x_diff = in.cols - ZX_SIZE_X;
     int x_start = 0;
     if (x_diff > 0)
@@ -108,6 +122,7 @@ void Convert(const std::string& input_file, const std::string& project, const in
         y_start = y_diff / 2;
     in(cv::Rect(x_start, y_start, std::min(in.cols, (int)ZX_SIZE_X), std::min(in.rows, 192))).copyTo(outsc);
 
+    GlobalStat gs = saver->AnalyzeGlobal(avail_paletteTC, outsc);
 
     // now statistics for 8x8
     unsigned rg = 0;
@@ -121,10 +136,10 @@ void Convert(const std::string& input_file, const std::string& project, const in
 
     unsigned free_prev_palette_items{ 0 }; // if prevoius group did not generate both entries, it might be used by next group
 
-    for (unsigned r = 0; r < outsc.rows && r < 192; r += saver->RowsInGroup())
+    for (unsigned r = 0; r < outsc.rows && r < 192; r += saver->RowsInGroup(), rg++)
     {
         cg = 0;
-        for (unsigned c = 0; c < outsc.cols && c < ZX_SIZE_X; c += saver->ColsInGroup())
+        for (unsigned c = 0; c < outsc.cols && c < ZX_SIZE_X; c += saver->ColsInGroup(), cg++)
         {
             std::cout << "Analyzing row group " << rg << ", column group " << cg << std::endl;
 
@@ -141,7 +156,7 @@ void Convert(const std::string& input_file, const std::string& project, const in
 
             auto& rev_col_map = ps.GetStat();
 
-            std::set<RGB> arleady_avail = saver->UsePrevPaletteEntries(vec_pal, pal_indx_base, c);
+            std::set<RGB> arleady_avail = saver->UsePrevPaletteEntries(vec_pal, pal_indx_base, c, r);
 
             auto it_s = rev_col_map.rbegin();
             int to_fill = 2 + free_prev_palette_items;
@@ -182,22 +197,28 @@ void Convert(const std::string& input_file, const std::string& project, const in
             {
                 //free_prev_palette_items = std::min(to_fill, 2);
             }
+        }
+    }
+
+    rg = 0;
+    for (unsigned r = 0; r < outsc.rows && r < 192; r += saver->RowsInGroup(), rg++)
+    {
+        cg = 0;
+        for (unsigned c = 0; c < outsc.cols && c < ZX_SIZE_X; c += saver->ColsInGroup(), cg++)
+        {
+            auto pal_indx_base = ((rg << 5) + cg) << 1;
 
             for (int r1 = 0; r1 < saver->RowsInGroup() && (r + r1) < 192 && (r + r1) < outsc.rows; r1++)
             {
                 for (int c1 = 0; c1 < saver->ColsInGroup() && (c + c1) < ZX_SIZE_X && (c + c1) < outsc.cols; c1++)
                 {
                     const auto& p = outsc.at<cv::Vec3b>(r + r1, c + c1);
- 
-                    auto best = saver->CodePixel(r + r1, c + c1, p, vec_pal, pal_indx_base);
 
-                    outzx.at<cv::Vec3b>(r+r1, c+c1) = best;
+                    auto best = saver->CodePixel(r + r1, c + c1, p, vec_pal, pal_indx_base);
+                    outzx.at<cv::Vec3b>(r + r1, c + c1) = best;
                 }
             }
-
-            cg++;
         }
-        rg++;
     }
  
     auto fn_base = input_file;
@@ -209,14 +230,14 @@ void Convert(const std::string& input_file, const std::string& project, const in
     }
 
     std::stringstream ss;
-    ss << fn_base << output_mode << ".h";
+    ss << fn_base << output_mode_prefix << ".h";
 
     std::ofstream ofm{ ss.str()};
     saver->SaveHeader(ofm, project);
     ofm.close();
 
     ss.str("");
-    ss << fn_base << output_mode << ".c";
+    ss << fn_base << output_mode_prefix << ".c";
 
     ofm.open(ss.str(), std::ios::trunc);
     saver->SaveCFile(ofm, project, vec_pal);
@@ -226,13 +247,13 @@ void Convert(const std::string& input_file, const std::string& project, const in
     cv::Mat imzx;
     cv::resize(outzx, imzx, cv::Size(), ZX_SIZE_X < 256 ? 8 : 4, 4);
     ss.str("");
-    ss << fn_base << output_mode << "_zx.bmp";
+    ss << fn_base << output_mode_prefix << "_zx.bmp";
     cv::imwrite(ss.str(), outzx);
 
     cv::Mat im;
     cv::resize(outsc, im, cv::Size(), ZX_SIZE_X < 256 ? 8 : 4, 4);
     ss.str("");
-    ss << fn_base << output_mode << "_preview.bmp";;
+    ss << fn_base << output_mode_prefix << "_preview.bmp";;
     cv::imwrite(ss.str(), in);
     cv::imshow(input_file, im);
     cv::imshow("zx", imzx);
@@ -250,16 +271,18 @@ int main(int argc, char* argv[])
     }
 
     // 4 or 16 colors
-    unsigned output_mode = 0;
-    try
+    std::string str_om{ argv[3] };
+    OutputMode output_mode;
+    if (str_om == "4")
+        output_mode = OutputMode::cga4;
+    else if (str_om == "16")
+        output_mode = OutputMode::cga16;
+    else if (str_om == "dual")
+        output_mode = OutputMode::dual_playfield;
+    else
     {
-        output_mode = std::stoi(argv[3]);
-        if (output_mode != 4 and output_mode != 16)
-            throw std::out_of_range("");
-    }
-    catch (const std::exception&)
-    {
-        std::cerr << "Output mode ca be only 4 or 16" << std::endl;
+        std::cerr << "Output mode ca be only 4 or 16 or dual" << std::endl;
+        return -1;
     }
 
     Convert(argv[1], argv[2], output_mode);

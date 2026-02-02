@@ -13,6 +13,13 @@ bool operator<(const RGB& i, const RGB& o)
     return (i.b < o.b);
 }
 
+bool operator==(const RGB& i, const RGB& o)
+{
+    return i.r == o.r
+        && i.g == o.g
+        && i.b == o.b;
+}
+
 uchar ExpandRG(uchar in)
 {
     uchar out = in << 5;
@@ -86,6 +93,7 @@ RGB ToRGBf(const cv::Vec3b& p)
     col.r = r;
     return col;
 }
+
 uchar Pack(const RGB& c)
 {
     uchar uc = (c.g << 5)
@@ -95,6 +103,15 @@ uchar Pack(const RGB& c)
     return uc;
 }
 
+RGB Unpack(uchar c)
+{
+    RGB rgb;
+    rgb.b = c & 0x03;
+    rgb.g = (c & 0xE0) >> 5;
+    rgb.r = (c & 0x1C) >> 2;
+    
+    return rgb;
+}
 
 int Dist(const RGB& a, const cv::Vec3b& b)
 {
@@ -210,7 +227,7 @@ DistanceInfo  NearestPal(
     return DistanceInfo{ res, min_dist };
 }
 
-uchar spectrum_more_rg[16] = // 6080 (010 100) wzmocnienie R i G
+uchar spectrum_more_rg[16] = // 6080 (010 100) more R & G
 {
     0b00000000,     // 0000 black,
     0b00000010,     // 0001 blue
@@ -218,7 +235,7 @@ uchar spectrum_more_rg[16] = // 6080 (010 100) wzmocnienie R i G
     0b00010010,     // 0011 magenta.
     0b10000000,     // 0100 green 
     0b10000010,     // 0101 cyan
-    0b01110000,     // 0110 yellow
+    0b10010000,     // 0110 yellow
     0b10010010,     // 0111 gray
    
     0b01010000,     // 1000 brown
@@ -227,7 +244,8 @@ uchar spectrum_more_rg[16] = // 6080 (010 100) wzmocnienie R i G
     0b01011111,     // 1011
     0b11110000,     // 1100 
     0b11110011,     // 1101 
-    0b11011100,     // 1110 yellow
+    0b11111100,     // 1110 yellow
     0b11111111,     // 1111 white
 };
+
 

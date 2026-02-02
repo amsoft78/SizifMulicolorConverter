@@ -13,10 +13,11 @@ public:
     virtual unsigned RowsInGroup() const = 0;
     virtual unsigned ColsInGroup() const = 0;
     virtual unsigned ColsInAnalyzedGroup() const = 0; // number of pixels to be analyzed can be bigger than group width
-
+    virtual unsigned ScreenColumns() const = 0;
     virtual std::set<RGB> UsePrevPaletteEntries(const std::vector<RGB>& pal_rgb,
         unsigned pal_indx_base,
-        unsigned current_column) const = 0;
+        unsigned current_column,
+        unsigned current_row) const = 0;
 
     virtual bool CanUseNativeZXEntry(unsigned) = 0; // if saver can use matched ZX palette id directly
 
@@ -35,8 +36,6 @@ protected:
     void Save(std::ofstream& of, unsigned page) const;
 
     void SaveScreenPage(std::ofstream& of, unsigned page) const;
-    
-    //virtual void SavePalette(std::ofstream& of, const std::vector<RGB> pal, const std::string& prefix, const RGB* others) const = 0;
 };
 
 

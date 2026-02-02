@@ -36,6 +36,8 @@ struct GlobalStat
 };
 
 bool operator<(const RGB& i, const RGB& o);
+bool operator==(const RGB& i, const RGB& o);
+
 uchar ExpandRG(uchar in);
 uchar ExpandB(uchar in);
 cv::Vec3b Expand(unsigned); // expands ULA+ 
@@ -43,6 +45,7 @@ cv::Vec3b Expand(const RGB& cp);
 RGB ToRGB(const cv::Vec3b&);
 RGB ToRGBf(const cv::Vec3b&);
 uchar Pack(const RGB& c);
+RGB Unpack(uchar c);
 
 // distance of TrueColor entries
 int Dist(const cv::Vec3b& a, const cv::Vec3b& b);

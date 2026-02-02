@@ -19,7 +19,7 @@ GlobalStat Saver16::AnalyzeGlobal(const cv::Vec3b*, const cv::Mat& in)
 {
     auto nearest_low = Nearest{ _zx_palette, nullptr, {8, 9, 10, 11, 12, 13, 14, 15} };
 
-    PaletteStatistics ps{ unsigned(in.cols), (unsigned)in.rows,
+    PaletteStatistics ps{ unsigned(in.rows), (unsigned)in.cols,
                     in,
                     nearest_low, 0, 0 };
     auto& rev_col_map_low = ps.GetStat();
@@ -106,7 +106,10 @@ cv::Vec3b Saver16::CodePixel(unsigned row, unsigned col,
     return out_pixel_color;
 }
 
-std::set<RGB> Saver16::UsePrevPaletteEntries(const std::vector<RGB>& pal_rgb, unsigned pal_indx_base, unsigned current_column) const
+std::set<RGB> Saver16::UsePrevPaletteEntries(const std::vector<RGB>& pal_rgb,
+    unsigned pal_indx_base,
+    unsigned current_column,
+    unsigned current_row) const
 {
     std::set<RGB> arleady_avail;
 
@@ -135,8 +138,8 @@ bool Saver16::CanUseNativeZXEntry(unsigned zx_color)
 
 void Saver16::SaveHeader(std::ofstream& of, const std::string& project)
 {
-    of << "#define " << project << "16col0 0x" << _border_color << std::endl;
-    of << "#define " << project << "16rgb0 0x" << (int)Pack(_border_rgb) << std::endl;
+    of << "#define " << project << "16col0 0x" << std::hex << _border_color << std::endl;
+    of << "#define " << project << "16rgb0 0x" << std::hex << (int)Pack(_border_rgb) << std::endl;
  
     of << "extern void " << project << "16_show() __banked;" << std::endl;
 }

@@ -6,7 +6,6 @@ DistanceInfo Nearest::GetNearest(const cv::Vec3b& point) const
     int min_dist = std::numeric_limits<int>::max();
     for (int i = 0; i < 16; i++)
     {
-        //if (i == 0b0101 || i == 0b1000 || i == 0b1100)
         if (_excluded_indexes.find(i) != _excluded_indexes.cend())
             continue;
         auto dist = Dist(_palette_tc[i], point);

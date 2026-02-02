@@ -17,7 +17,7 @@ GlobalStat Saver4::AnalyzeGlobal(const cv::Vec3b* avail_paletteTC, const cv::Mat
          {0, 1, 2, 3, 4, 5, 6, 7} };
 
 
-    PaletteStatistics ps{ unsigned(in.cols), (unsigned)in.rows,
+    PaletteStatistics ps{ unsigned(in.rows), (unsigned)in.cols,
                     in,
                     nearest_high, 0, 0 };
     auto nearest_low = Nearest{ _zx_palette,
@@ -25,12 +25,12 @@ GlobalStat Saver4::AnalyzeGlobal(const cv::Vec3b* avail_paletteTC, const cv::Mat
         {8, 9, 10, 11, 12, 13, 14, 15} };
 
 
-    PaletteStatistics ps_low{ unsigned(in.cols), (unsigned)in.rows,
+    PaletteStatistics ps_low{ unsigned(in.rows), (unsigned)in.cols,
                     in,
                     nearest_low, 0, 0 };
 
     auto& rev_col_map_low = ps_low.GetStat();
-    std::cout << "LOW" << std::endl;
+    std::cout << "GLOBAL:" << std::endl;
     auto it_s = rev_col_map_low.rbegin();
     std::optional<ColorStatInfo> most_popular_low;
     for (unsigned k = 0;
@@ -53,55 +53,52 @@ GlobalStat Saver4::AnalyzeGlobal(const cv::Vec3b* avail_paletteTC, const cv::Mat
         }
     }
 
-    PaletteStatistics ps_high{ unsigned(in.cols), (unsigned)in.rows,
-                     in,
-                     nearest_high, 0, 0 };
-
-    auto& rev_col_map_high = ps_high.GetStat();
-
-    it_s = rev_col_map_high.rbegin();
-    std::optional<ColorStatInfo> most_popular_high;
-    std::cout << "HIGH" << std::endl;
-    for (unsigned k = 0;
-        (k < 8) && it_s != rev_col_map_high.rend();
-        ++k, ++it_s)
-    {
-        std::cout << "    count: " << it_s->first
-            << ", r: " << (int)(it_s->second.rgb.r)
-            << ", g: " << (int)(it_s->second.rgb.g)
-            << ", b: " << (int)(it_s->second.rgb.b)
-            << std::hex
-            << ", COL: 0x" << ((it_s->second.rgb.g << 5) + (it_s->second.rgb.r << 2) + it_s->second.rgb.b)
-            << std::dec
-            << ", ZX color " << it_s->second.entry_indx << ", dist " << it_s->second.entry_distance
-            << std::endl;
-        if (!most_popular_high.has_value())
-        {
-            bool a = it_s->second.rgb < most_popular_low->rgb;
-            bool b = most_popular_low->rgb < it_s->second.rgb;
-            if (!most_popular_low.has_value() || ((it_s->second.rgb < most_popular_low->rgb) || (most_popular_low->rgb < it_s->second.rgb)))
-            {
-                most_popular_high = it_s->second;
-                std::cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << std::endl;
-            }
-        }
-    }
-
     if (most_popular_low.has_value())
     {
         _g.col_global0_indx = most_popular_low->entry_indx;
         _g.col_global0 = _zx_palette[*_g.col_global0_indx];
         _g.col_global0_rgb = most_popular_low->rgb;
     }
-    if (most_popular_high.has_value())
+
+    // now lets cut the rows for "extended timex color"
+    auto nearest = Nearest{ _zx_palette,
+        avail_paletteTC,
+        {} };
+    
+    _color4.resize(24);
+    for (unsigned row = 0; row < 192; row+=8)
     {
-        _g.col_global1_indx = most_popular_high->entry_indx;
-        _g.col_global1 = _zx_palette[*_g.col_global1_indx];
-        _g.col_global1_rgb = most_popular_high->rgb;
-    }
+        PaletteStatistics ps{ 8, (unsigned)in.cols,
+                        in,
+                        nearest, row, 0 };
+
+        auto& rev_col_map = ps.GetStat();
+        bool stored{ false };
+        std::cout << "Analyzing row " << row << std::endl;
+        for (auto it_s = rev_col_map.rbegin(); it_s != rev_col_map.rend(); ++it_s)
+        {
+            std::cout << "    count: " << it_s->first
+            << ", r: " << (int)it_s->second.rgb.r
+            << ", g: " << (int)it_s->second.rgb.g
+            << ", b: " << (int)it_s->second.rgb.b
+            << std::hex
+            << ", COL: 0x" << ((it_s->second.rgb.g << 5) + (it_s->second.rgb.r << 2) + it_s->second.rgb.b)
+            << std::dec
+            << ", ZX color " << it_s->second.entry_indx << ", dist " << it_s->second.entry_distance
+            << std::endl;
+
+        
+            if (!stored && !(it_s->second.rgb == _g.col_global0_rgb))
+            {
+                _color4[row >> 3] = it_s->second.rgb;
+                stored = true;
+            }   
+        }
+        if (!stored)
+            _color4[row >> 3] = RGB{};
+     }
 
     return _g;
-
 }
 
 void Saver4::PutPixel(unsigned row, unsigned col, unsigned val)
@@ -145,27 +142,31 @@ void Saver4::PutPixel(unsigned row, unsigned col, unsigned val)
     }
 }
 
-cv::Vec3b Saver4::CodePixel(unsigned row, unsigned col, const cv::Vec3b& p, const std::vector<RGB>& pal_rgb, unsigned pal_indx_base)
+cv::Vec3b Saver4::CodePixel(unsigned row, unsigned col,
+    const cv::Vec3b& p,
+    const std::vector<RGB>& pal_rgb,
+    unsigned pal_indx_base)
 {
-    int dist_c0 = _g.col_global0_rgb.has_value()
-        ? Dist(*_g.col_global0_rgb, p)
+    int dist_c0 = _g.col_global0_indx.has_value()
+        ? Dist(this->_zx_palette[*_g.col_global0_indx], p)
         : std::numeric_limits<int>::max();
-    int dist_c1 = _g.col_global1_rgb.has_value()
-        ? Dist(*_g.col_global1_rgb, p)
-        : std::numeric_limits<int>::max();
+
+    // 4th color
+    const auto& color4 = _color4[row >> 3];
+    int dist_c1 = Dist(color4, p);
+ 
     auto nearest_palette = NearestPal(pal_rgb, pal_indx_base, 2, p);
 
     cv::Vec3b best;
     unsigned code = 0;
     if (dist_c0 <= dist_c1 && dist_c0 < nearest_palette.dinstance) // prefer local attributes, as they have 16 not 8 colors
     {
-        best = Expand(*_g.col_global0_rgb);
+        best = Expand(*_g.col_global0);
         code = 0b01; // code for BACkGROUND color
-        //second_plane = 0b00; // ignored zero
     }
     else if (dist_c1 < nearest_palette.dinstance)
     {
-        best = Expand(*_g.col_global1_rgb);
+        best = Expand(color4); // *_g.col_global1);
         code = 0b11; // code for TIMEX color
     }
     else
@@ -181,67 +182,59 @@ cv::Vec3b Saver4::CodePixel(unsigned row, unsigned col, const cv::Vec3b& p, cons
 
 std::set<RGB> Saver4::UsePrevPaletteEntries(const std::vector<RGB>& /*pal_rgb*/,
     unsigned /*pal_indx_base*/,
-    unsigned /*current_column*/) const
+    unsigned /*current_column*/,
+    unsigned current_row) const
 {
     std::set<RGB> arleady_avail;
     if (_g.col_global0_rgb.has_value())
-        arleady_avail.insert(*_g.col_global0_rgb);
-    if (_g.col_global1_rgb.has_value())
-        arleady_avail.insert(*_g.col_global1_rgb);
+        arleady_avail.insert(Unpack(*_g.col_global0));
+    // 4th color
+    const auto& color4 = _color4[current_row >> 3];
+    arleady_avail.insert(color4);
+    //if (_g.col_global1_rgb.has_value())
+    //    arleady_avail.insert(*_g.col_global1_rgb);
     return arleady_avail;
+}
+
+void Saver4::_SaveHeader(std::ofstream& of, const std::string& project) const
+{
+    of << "#define " << project << "col0 0x" << std::hex << *_g.col_global0_indx << std::endl;
+    of << "#define " << project << "rgb0 0x" << std::hex << (int)Pack(*_g.col_global0_rgb) << std::endl;
+
+    of << "extern void " << project << "_show() __banked;" << std::endl;
+    of << "extern void " << project << "_prepare_colors() __banked;" << std::endl;
 }
 
 void Saver4::SaveHeader(std::ofstream& of, const std::string& project)
 {
-    of << "#define " << project << "col0 0x" << *_g.col_global0_indx << std::endl;
-    of << "#define " << project << "rgb0 0x" << (int)Pack(*_g.col_global0_rgb) << std::endl;
-    of << "#define " << project << "col3 0x" << *_g.col_global1_indx << std::endl;
-
-    of << "extern void " << project << "_show() __banked;" << std::endl;
+    std::string fullname = project + "4";
+    _SaveHeader(of, fullname);
 }
 
 void Saver4::SaveCFile(std::ofstream& of, const std::string& project, const std::vector<RGB>& attribs)
 {
     std::string fullname = project + "4";
     Saver::SaveCFile(of, fullname, attribs);
+    _Save4thColor(of, fullname);
 }
 
-/*
-void Saver4::SavePalette(std::ofstream& of, const std::vector<RGB> pal, const std::string& prefix, const RGB* others) const
+void Saver4::_Save4thColor(std::ofstream& of, const std::string& project) const
 {
-    unsigned zx_pal[48];
-    for (unsigned i = 0; i < 48; i++)
+    of << "void SetColor(unsigned char entry, unsigned char value);" << std::endl;
+    of << "void " << project << "_prepare_colors()" << std::endl;
+    of << "{" << std::endl;
+    for (unsigned clutch = 0; clutch < 3; clutch++)
     {
-        // addressing bits are swapped, bit 3 swaps ink / paper
-        // 00ccPeee cc -> clutch, eee-entry 
-        // in this solution entry bit 1 is in bit 3, entry bit 0 is in bit 0
-        unsigned in_grp = i >> 2;
-        unsigned in_grpH = (in_grp & 0b1100) >> 2;
-        unsigned in_grpL = in_grp & 0b0011;
-        unsigned H = 0 == ((i & 0b0010) >> 1);
-        unsigned L = i & 0b0001;
-        // zle unsigned indx = (in_grpH << 4) | (L << 3) | (in_grpL << 1) | H;
-        unsigned indx = (in_grpH << 4) | (H << 3) | (in_grpL << 1) | L;
-        const auto& c = pal[i];
-        unsigned char entry = (c.g << 5) | (c.r << 2) | c.b;
-        _ASSERT(indx < 48);
-        zx_pal[indx] = entry;
-    }
-    of << "const char " << prefix << "_palette[] = {" << std::hex << std::endl;
-
-    for (unsigned i = 0; i < 3; i++)
-    {
-        for (unsigned j = 0; j < 16; j++)
+        for (unsigned c = 0; c < 8; c++)
         {
-            of << "0x" << (int)zx_pal[i * 16 + j];
-            if (j != 15 || i != 2)
-                of << ", ";
+            unsigned uplus_index = (clutch << 4) + c;
+            unsigned index = (clutch << 3) + c;
+            of << "    SetColor(" << std::dec << uplus_index << ", 0x"
+                << std::hex << (int)Pack(_color4[index]) << ");" << std::endl;
         }
-        of << std::endl;
     }
-    of << "};" << std::endl;
+
+    of << "}" << std::endl;
+
 }
-
-*/
-
 
