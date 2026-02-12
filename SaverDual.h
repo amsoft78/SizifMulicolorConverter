@@ -32,6 +32,11 @@ public:
         return 128;
     }
 
+    virtual std::set<RGB> UsePrevPaletteEntries(const std::vector<RGB>& pal_rgb,
+        unsigned pal_indx_base,
+        unsigned current_column,
+        unsigned current_row) const override;
+
     virtual void SavePaletteAsAtributes(std::ofstream& of,
         const std::vector<RGB>& attribs,
         const std::string& prefix) const override;

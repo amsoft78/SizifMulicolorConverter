@@ -10,6 +10,21 @@ SaverDual::SaverDual(const uchar* avail_zx_palette_as_rgb)
 {
 }
 
+std::set<RGB> SaverDual::UsePrevPaletteEntries(const std::vector<RGB>& pal_rgb, unsigned pal_indx_base, unsigned current_column, unsigned current_row) const
+{
+    std::set<RGB> arleady_avail;
+    if (_g.col_global0.has_value())
+        arleady_avail.insert(Unpack(*_g.col_global0));
+    // 4th color
+    unsigned ext_color_index = current_row >> 3;
+    if (ext_color_index > 0)
+    {
+        const auto& color4 = _color4[ext_color_index];
+        arleady_avail.insert(color4);
+    }
+    return arleady_avail;
+}
+
 void SaverDual::SavePaletteAsAtributes(std::ofstream& of, const std::vector<RGB>& attribs, const std::string& prefix) const
 {
     for (unsigned page = 0; page <= 1; page++)
@@ -63,10 +78,14 @@ void SaverDual::SaveCFile(std::ofstream& of, const std::string& project0, const 
     of << "{" << std::endl;
     of << "    memcpy((void*)0x5800, " << project << "_attribs0, 768);" << std::endl;
     of << "    memcpy((void*)0x7800, " << project << "_attribs1, 768);" << std::endl;
-    of << "    memset((void*)0x4000, 0xff, 6144);" << std::endl;
+    of << "    memset((void*)0x4000, 0xaa, 6144);" << std::endl;
     of << "    memcpy((void*)0x6000, " << project << "_page_1, 6144);" << std::endl;
     of << "}" << std::endl;
+    of << "void SetColor(unsigned char entry, unsigned char value);" << std::endl;
+    of << "void " << project << "_prepare_colors()" << std::endl;
+    of << "{" << std::endl;
     _Save4thColor(of, project);
+    of << "}" << std::endl;
 }
 
 void SaverDual::PutPixel(unsigned row, unsigned col, unsigned val)
@@ -130,18 +149,17 @@ cv::Vec3b SaverDual::CodePixel(unsigned row, unsigned col, const cv::Vec3b& p, c
     if (dist_c0 <= dist_c1 && dist_c0 < nearest_palette.dinstance) // prefer local attributes, as they have 16 not 8 colors
     {
         best = Expand(*_g.col_global0);
-        code = 0b01; // code for BACkGROUND color
-        //second_plane = 0b00; // ignored zero
+        code = 0b00; // code for BACKGROUND color
     }
     else if (dist_c1 < nearest_palette.dinstance)
     {
         best = Expand(color4); // *_g.col_global1);
-        code = 0b11; // code for TIMEX color
+        code = 0b10; // code for TIMEX color
     }
     else
     {
         best = Expand(pal_rgb[nearest_palette.indx + start_palette]);
-        code = nearest_palette.indx << 1;
+        code = (nearest_palette.indx << 1) | 0b01;
     }
 
     PutPixel(row, col, code);

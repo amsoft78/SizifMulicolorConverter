@@ -65,6 +65,7 @@ GlobalStat Saver4::AnalyzeGlobal(const cv::Vec3b* avail_paletteTC, const cv::Mat
         avail_paletteTC,
         {} };
     
+    _color0.resize(24);
     _color4.resize(24);
     for (unsigned row = 0; row < 192; row+=8)
     {
@@ -73,7 +74,8 @@ GlobalStat Saver4::AnalyzeGlobal(const cv::Vec3b* avail_paletteTC, const cv::Mat
                         nearest, row, 0 };
 
         auto& rev_col_map = ps.GetStat();
-        bool stored{ false };
+        bool stored0{ false };
+        bool stored4{ false };
         std::cout << "Analyzing row " << row << std::endl;
         for (auto it_s = rev_col_map.rbegin(); it_s != rev_col_map.rend(); ++it_s)
         {
@@ -87,16 +89,22 @@ GlobalStat Saver4::AnalyzeGlobal(const cv::Vec3b* avail_paletteTC, const cv::Mat
             << ", ZX color " << it_s->second.entry_indx << ", dist " << it_s->second.entry_distance
             << std::endl;
 
-        
-            if (!stored && !(it_s->second.rgb == _g.col_global0_rgb))
+            if (!stored0)
+            {
+                _color0[row >> 3] = it_s->second.rgb;
+                stored0 = true;
+            }   
+            else if (!stored4)
             {
                 _color4[row >> 3] = it_s->second.rgb;
-                stored = true;
-            }   
+                stored4 = true;
+            }
         }
-        if (!stored)
+        if (!stored0)
+            _color0[row >> 3] = RGB{};
+        if (!stored4)
             _color4[row >> 3] = RGB{};
-     }
+    }
 
     return _g;
 }
@@ -147,13 +155,18 @@ cv::Vec3b Saver4::CodePixel(unsigned row, unsigned col,
     const std::vector<RGB>& pal_rgb,
     unsigned pal_indx_base)
 {
-    int dist_c0 = _g.col_global0_indx.has_value()
+/*    int dist_c0 = _g.col_global0_indx.has_value()
         ? Dist(this->_zx_palette[*_g.col_global0_indx], p)
         : std::numeric_limits<int>::max();
+        */
+    unsigned ext_color_index = row >> 3;
+    const auto& color0 = _color0[ext_color_index];
+    // no use of extended colors in first 8 rows
+    int dist_c0 = ext_color_index > 0 ? Dist(color0, p) : std::numeric_limits<int>::max();
 
     // 4th color
     const auto& color4 = _color4[row >> 3];
-    int dist_c1 = Dist(color4, p);
+    int dist_c1 = ext_color_index > 0 ? Dist(color4, p) : std::numeric_limits<int>::max();
  
     auto nearest_palette = NearestPal(pal_rgb, pal_indx_base, 2, p);
 
@@ -161,18 +174,18 @@ cv::Vec3b Saver4::CodePixel(unsigned row, unsigned col,
     unsigned code = 0;
     if (dist_c0 <= dist_c1 && dist_c0 < nearest_palette.dinstance) // prefer local attributes, as they have 16 not 8 colors
     {
-        best = Expand(*_g.col_global0);
-        code = 0b01; // code for BACkGROUND color
+        best = Expand(color0);
+        code = 0b00; // code for BACKGROUND color
     }
     else if (dist_c1 < nearest_palette.dinstance)
     {
         best = Expand(color4); // *_g.col_global1);
-        code = 0b11; // code for TIMEX color
+        code = 0b10; // code for TIMEX color
     }
     else
     {
         best = Expand(pal_rgb[nearest_palette.indx + pal_indx_base]);
-        code = nearest_palette.indx << 1;
+        code = (nearest_palette.indx << 1) | 0b01;
     }
 
     PutPixel(row, col, code);
@@ -186,11 +199,15 @@ std::set<RGB> Saver4::UsePrevPaletteEntries(const std::vector<RGB>& /*pal_rgb*/,
     unsigned current_row) const
 {
     std::set<RGB> arleady_avail;
-    if (_g.col_global0_rgb.has_value())
-        arleady_avail.insert(Unpack(*_g.col_global0));
     // 4th color
-    const auto& color4 = _color4[current_row >> 3];
-    arleady_avail.insert(color4);
+    unsigned ext_color_index = current_row >> 3;
+    if (ext_color_index > 0)
+    {
+        const auto& color4 = _color4[ext_color_index];
+        arleady_avail.insert(color4);
+        const auto& color0 = _color0[ext_color_index];
+        arleady_avail.insert(color0);
+    }
     //if (_g.col_global1_rgb.has_value())
     //    arleady_avail.insert(*_g.col_global1_rgb);
     return arleady_avail;
@@ -215,26 +232,41 @@ void Saver4::SaveCFile(std::ofstream& of, const std::string& project, const std:
 {
     std::string fullname = project + "4";
     Saver::SaveCFile(of, fullname, attribs);
+    of << "void SetColor(unsigned char entry, unsigned char value);" << std::endl;
+    of << "void " << fullname << "_prepare_colors()" << std::endl;
+    of << "{" << std::endl;
     _Save4thColor(of, fullname);
+    _Save0thColor(of, fullname);
+    of << "}" << std::endl;
 }
 
 void Saver4::_Save4thColor(std::ofstream& of, const std::string& project) const
 {
-    of << "void SetColor(unsigned char entry, unsigned char value);" << std::endl;
-    of << "void " << project << "_prepare_colors()" << std::endl;
-    of << "{" << std::endl;
     for (unsigned clutch = 0; clutch < 3; clutch++)
     {
         for (unsigned c = 0; c < 8; c++)
         {
             unsigned uplus_index = (clutch << 4) + c;
-            unsigned index = (clutch << 3) + c;
-            of << "    SetColor(" << std::dec << uplus_index << ", 0x"
-                << std::hex << (int)Pack(_color4[index]) << ");" << std::endl;
+            unsigned index = (clutch << 3) + c + 1;
+            if (index < 24)
+                of << "    SetColor(" << std::dec << uplus_index << ", 0x"
+                    << std::hex << (int)Pack(_color4[index]) << ");" << std::endl;
         }
     }
-
-    of << "}" << std::endl;
-
 }
 
+void Saver4::_Save0thColor(std::ofstream& of, const std::string& project) const
+{
+    for (unsigned clutch = 0; clutch < 3; clutch++)
+    {
+        for (unsigned c = 0; c < 8; c++)
+        {
+            unsigned uplus_index = (clutch << 4) + c + 8;
+
+            unsigned index = (clutch << 3) + c + 1;
+            if (index < 24)
+                of << "    SetColor(" << std::dec << uplus_index << ", 0x"
+                << std::hex << (int)Pack(_color0[index]) << ");" << std::endl;
+        }
+    }
+}

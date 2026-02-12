@@ -85,16 +85,16 @@ cv::Vec3b Saver16::CodePixel(unsigned row, unsigned col,
         switch (code)
         {
         case 0b00:
-            zx_col = 0b0001;
-            break;
-        case 0b10:
             zx_col = 0b0101;
             break;
+        case 0b10:
+            zx_col = 0b0001;
+            break;
         case 0b01:
-            zx_col = 0b1000;
+            zx_col = 0b1100;
             break;
         case 0b11:
-            zx_col = 0b1100;
+            zx_col = 0b1000;
             break;
         default:
             throw std::runtime_error("incorrect!");
