@@ -157,6 +157,7 @@
     <ClCompile Include="Saver16.cpp" />
     <ClCompile Include="Saver4.cpp" />
     <ClCompile Include="SaverDual.cpp" />
+    <ClCompile Include="SaverHR.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="base.h" />
@@ -167,6 +168,7 @@
     <ClInclude Include="Saver16.h" />
     <ClInclude Include="Saver4.h" />
     <ClInclude Include="SaverDual.h" />
+    <ClInclude Include="SaverHR.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

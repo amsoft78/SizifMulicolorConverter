@@ -5,7 +5,8 @@
 
 Saver::Saver(const uchar* avail_zx_palette_as_rgb)
 {
-    memcpy(_zx_palette, avail_zx_palette_as_rgb, 16);
+    if (avail_zx_palette_as_rgb)
+        memcpy(_zx_palette, avail_zx_palette_as_rgb, 16);
     out_page0 = new uchar[32 * 192];
     out_page1 = new uchar[32 * 192];
     memset(out_page0, 0, 32 * 192);

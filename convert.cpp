@@ -12,6 +12,7 @@
 #include "Saver4.h"
 #include "Saver16.h"
 #include "SaverDual.h"
+#include "SaverHR.h"
 
 #include <optional>
 #include <bitset>
@@ -21,51 +22,49 @@ enum class OutputMode
 {
     cga4,
     cga16,
-    dual_playfield
+    dual_playfield,
+    timex_hr,
 };
 
 void Convert(const std::string& input_file, const std::string& project, const OutputMode output_mode)
 {
-    //ColorInfo col_info[16];
     const auto avail_palette_16 = spectrum_more_rg;
     cv::Vec3b TC[16];
 
 
         for (unsigned j = 0; j < 16; j++)
         {
-            //col_info[j].tc = Expand(avail_palette_16[j]);
             TC[j] = Expand(avail_palette_16[j]);
-            //col_info[j].rgb256 = avail_palette_16[j];
         }
 
     const cv::Vec3b* avail_paletteTC = TC;
-
-    //ShowPalette(col_info);
     
     cv::Mat in;
 
     std::unique_ptr<Saver> saver;
     std::string output_mode_prefix;
 
-    if (output_mode == OutputMode::cga16)
+    switch (output_mode)
     {
+    case OutputMode::cga16:
         saver = std::make_unique <Saver16>(avail_palette_16);
         output_mode_prefix = "16";
+        break;
+    case OutputMode::cga4:
+        saver = std::make_unique <Saver4>(avail_palette_16);
+        output_mode_prefix = "4";
+        break;
+    case OutputMode::dual_playfield:
+        saver = std::make_unique <SaverDual>(avail_palette_16);
+        output_mode_prefix = "dp";
+        break;
+    case OutputMode::timex_hr:
+        saver = std::make_unique <SaverHR>();
+        output_mode_prefix = "hr";
+        break;
+    default:
+        return;
     }
-    else
-        if (output_mode == OutputMode::cga4)
-        {
-            saver = std::make_unique <Saver4>(avail_palette_16);
-            output_mode_prefix = "4";
-        }
-        else
-            if (output_mode == OutputMode::dual_playfield)
-            {
-                saver = std::make_unique <SaverDual>(avail_palette_16);
-                output_mode_prefix = "dp";
-            }
-            else
-                return;
 
     const int ZX_SIZE_X = saver->ScreenColumns();
     bool is_commodore{ false };
@@ -91,18 +90,18 @@ void Convert(const std::string& input_file, const std::string& project, const Ou
 
     double factor_y = 1.0;
 
-    if (in.cols < ZX_SIZE_X * 0.625)
+    if (in.cols <= ZX_SIZE_X * 0.625)
     {
-        while (in.cols * factor < ZX_SIZE_X * 0.625)
+        while (in.cols * factor <= ZX_SIZE_X * 0.625)
         {
             factor = factor * 2;
             if (in.rows * factor_y <= 128)
                 factor_y = factor_y * 2;
         }
     }
-    else if (in.cols * factor > ZX_SIZE_X * 1.25)
+    else if (in.cols * factor >= ZX_SIZE_X * 1.25)
     {
-        while (in.cols * factor > ZX_SIZE_X * 1.7)
+        while (in.cols * factor > ZX_SIZE_X * 1.25)
         {
             factor = factor / 2;
             if (in.rows * factor_y > 256)
@@ -136,6 +135,7 @@ void Convert(const std::string& input_file, const std::string& project, const Ou
 
     unsigned free_prev_palette_items{ 0 }; // if prevoius group did not generate both entries, it might be used by next group
 
+    if (saver->RowsInGroup() > 1 && saver->ColsInGroup() > 1)
     for (unsigned r = 0; r < outsc.rows && r < 192; r += saver->RowsInGroup(), rg++)
     {
         cg = 0;
@@ -245,13 +245,14 @@ void Convert(const std::string& input_file, const std::string& project, const Ou
     ofm.close();
     
     cv::Mat imzx;
-    cv::resize(outzx, imzx, cv::Size(), ZX_SIZE_X < 256 ? 8 : 4, 4);
+    auto factorx = ZX_SIZE_X < 256 ? 8 : (ZX_SIZE_X < 512 ? 4 : 2);
+    cv::resize(outzx, imzx, cv::Size(), factorx, 4);
     ss.str("");
     ss << fn_base << output_mode_prefix << "_zx.bmp";
     cv::imwrite(ss.str(), outzx);
 
     cv::Mat im;
-    cv::resize(outsc, im, cv::Size(), ZX_SIZE_X < 256 ? 8 : 4, 4);
+    cv::resize(outsc, im, cv::Size(), factorx, 4);
     ss.str("");
     ss << fn_base << output_mode_prefix << "_preview.bmp";;
     cv::imwrite(ss.str(), in);
@@ -279,6 +280,8 @@ int main(int argc, char* argv[])
         output_mode = OutputMode::cga16;
     else if (str_om == "dual")
         output_mode = OutputMode::dual_playfield;
+    else if (str_om == "hr")
+        output_mode = OutputMode::timex_hr;
     else
     {
         std::cerr << "Output mode ca be only 4 or 16 or dual" << std::endl;
