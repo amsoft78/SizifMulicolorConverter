@@ -10,6 +10,7 @@
 
 #include "PaletteStatistics.h"
 #include "Saver4.h"
+#include "Saver4noUP.h"
 #include "Saver16.h"
 #include "SaverDual.h"
 #include "SaverHR.h"
@@ -21,6 +22,7 @@
 enum class OutputMode
 {
     cga4,
+    cga4_noUP,
     cga16,
     dual_playfield,
     timex_hr,
@@ -53,6 +55,10 @@ void Convert(const std::string& input_file, const std::string& project, const Ou
     case OutputMode::cga4:
         saver = std::make_unique <Saver4>(avail_palette_16);
         output_mode_prefix = "4";
+        break;
+    case OutputMode::cga4_noUP:
+        saver = std::make_unique <Saver4noUP>(avail_palette_16);
+        output_mode_prefix = "4np";
         break;
     case OutputMode::dual_playfield:
         saver = std::make_unique <SaverDual>(avail_palette_16);
@@ -276,6 +282,8 @@ int main(int argc, char* argv[])
     OutputMode output_mode;
     if (str_om == "4")
         output_mode = OutputMode::cga4;
+    else if (str_om == "4np")
+        output_mode = OutputMode::cga4_noUP;
     else if (str_om == "16")
         output_mode = OutputMode::cga16;
     else if (str_om == "dual")

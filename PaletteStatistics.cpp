@@ -33,7 +33,7 @@ PaletteStatistics::PaletteStatistics(
             ExpandRG(it.first.r)
         };
         auto near = dist_measure.GetNearest(color_point);
-        auto stat = ColorStatInfo{ it.first, near.indx, near.dinstance };
+        auto stat = ColorStatInfo{ it.first, near.indx, near.distance };
         _rev_col_map.insert(std::make_pair(it.second, stat));
     }
 }

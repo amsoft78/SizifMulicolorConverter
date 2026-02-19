@@ -156,6 +156,7 @@
     <ClCompile Include="Saver.cpp" />
     <ClCompile Include="Saver16.cpp" />
     <ClCompile Include="Saver4.cpp" />
+    <ClCompile Include="Saver4noUP.cpp" />
     <ClCompile Include="SaverDual.cpp" />
     <ClCompile Include="SaverHR.cpp" />
   </ItemGroup>
@@ -167,6 +168,7 @@
     <ClInclude Include="Saver.h" />
     <ClInclude Include="Saver16.h" />
     <ClInclude Include="Saver4.h" />
+    <ClInclude Include="Saver4noUP.h" />
     <ClInclude Include="SaverDual.h" />
     <ClInclude Include="SaverHR.h" />
   </ItemGroup>

@@ -47,13 +47,7 @@ public:
     virtual void SaveCFile(std::ofstream& of, const std::string& project, const std::vector<RGB>& attribs) override;
 
 protected:
-    //GlobalStat _g;
-    // rows with ULAPlus color 00
-    //std::vector<RGB> _color0;
-    // rows with ULAPlus color 4
-    //std::vector<RGB> _color4;
-
-    //void _SaveHeader(std::ofstream& of, const std::string& project) const;
+    double _mean_y;
 
     virtual void PutPixel(unsigned row, unsigned col, unsigned val) override;
 };

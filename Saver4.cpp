@@ -150,15 +150,16 @@ void Saver4::PutPixel(unsigned row, unsigned col, unsigned val)
     }
 }
 
+std::string Saver4::GetFullProjectName(const std::string& core) const
+{
+    return core+"4";
+}
+
 cv::Vec3b Saver4::CodePixel(unsigned row, unsigned col,
     const cv::Vec3b& p,
     const std::vector<RGB>& pal_rgb,
     unsigned pal_indx_base)
 {
-/*    int dist_c0 = _g.col_global0_indx.has_value()
-        ? Dist(this->_zx_palette[*_g.col_global0_indx], p)
-        : std::numeric_limits<int>::max();
-        */
     unsigned ext_color_index = row >> 3;
     const auto& color0 = _color0[ext_color_index];
     // no use of extended colors in first 8 rows
@@ -172,12 +173,12 @@ cv::Vec3b Saver4::CodePixel(unsigned row, unsigned col,
 
     cv::Vec3b best;
     unsigned code = 0;
-    if (dist_c0 <= dist_c1 && dist_c0 < nearest_palette.dinstance) // prefer local attributes, as they have 16 not 8 colors
+    if (dist_c0 <= dist_c1 && dist_c0 < nearest_palette.distance) // prefer local attributes, as they have 16 not 8 colors
     {
         best = Expand(color0);
         code = 0b00; // code for BACKGROUND color
     }
-    else if (dist_c1 < nearest_palette.dinstance)
+    else if (dist_c1 < nearest_palette.distance)
     {
         best = Expand(color4); // *_g.col_global1);
         code = 0b10; // code for TIMEX color
@@ -199,7 +200,7 @@ std::set<RGB> Saver4::UsePrevPaletteEntries(const std::vector<RGB>& /*pal_rgb*/,
     unsigned current_row) const
 {
     std::set<RGB> arleady_avail;
-    // 4th color
+    // 0th 4th color
     unsigned ext_color_index = current_row >> 3;
     if (ext_color_index > 0)
     {
@@ -208,29 +209,24 @@ std::set<RGB> Saver4::UsePrevPaletteEntries(const std::vector<RGB>& /*pal_rgb*/,
         const auto& color0 = _color0[ext_color_index];
         arleady_avail.insert(color0);
     }
-    //if (_g.col_global1_rgb.has_value())
-    //    arleady_avail.insert(*_g.col_global1_rgb);
     return arleady_avail;
 }
 
-void Saver4::_SaveHeader(std::ofstream& of, const std::string& project) const
+void Saver4::SaveHeader(std::ofstream& of, const std::string& project0)
 {
+    std::string project = GetFullProjectName(project0);
     of << "#define " << project << "col0 0x" << std::hex << *_g.col_global0_indx << std::endl;
+    if (_g.col_global1_indx.has_value())
+        of << "#define " << project << "col1 0x" << std::hex << *_g.col_global1_indx << std::endl;
     of << "#define " << project << "rgb0 0x" << std::hex << (int)Pack(*_g.col_global0_rgb) << std::endl;
 
     of << "extern void " << project << "_show() __banked;" << std::endl;
     of << "extern void " << project << "_prepare_colors() __banked;" << std::endl;
 }
 
-void Saver4::SaveHeader(std::ofstream& of, const std::string& project)
-{
-    std::string fullname = project + "4";
-    _SaveHeader(of, fullname);
-}
-
 void Saver4::SaveCFile(std::ofstream& of, const std::string& project, const std::vector<RGB>& attribs)
 {
-    std::string fullname = project + "4";
+    std::string fullname = GetFullProjectName(project);
     Saver::SaveCFile(of, fullname, attribs);
     of << "void SetColor(unsigned char entry, unsigned char value);" << std::endl;
     of << "void " << fullname << "_prepare_colors()" << std::endl;

@@ -55,16 +55,17 @@ void SaverDual::SavePaletteAsAtributes(std::ofstream& of, const std::vector<RGB>
         of << "};" << std::endl;
     }
 }
-
+/*
 void SaverDual::SaveHeader(std::ofstream& of, const std::string& project)
 {
     std::string fullname = project + "dp";
     Saver4::_SaveHeader(of, fullname);
 }
+*/
 
 void SaverDual::SaveCFile(std::ofstream& of, const std::string& project0, const std::vector<RGB>& attribs)
 {
-    std::string project = project0 + "dp";
+    std::string project = this->GetFullProjectName(project0);
     of << "#pragma bank ?" << std::endl;
 
     of << "#include \"" << project << ".h\"" << std::endl;
@@ -122,6 +123,11 @@ void SaverDual::PutPixel(unsigned row, unsigned col, unsigned val)
     out_page1[addr] = (out_page1[addr] & mask) | bits2; 
 }
 
+std::string SaverDual::GetFullProjectName(const std::string& core) const
+{
+    return core+"dp";
+}
+
 cv::Vec3b SaverDual::CodePixel(unsigned row, unsigned col, const cv::Vec3b& p, const std::vector<RGB>& pal_rgb, unsigned pal_indx_base)
 {
     int dist_c0 = _g.col_global0_rgb.has_value()
@@ -146,12 +152,12 @@ cv::Vec3b SaverDual::CodePixel(unsigned row, unsigned col, const cv::Vec3b& p, c
 
     cv::Vec3b best;
     unsigned code = 0;
-    if (dist_c0 <= dist_c1 && dist_c0 < nearest_palette.dinstance) // prefer local attributes, as they have 16 not 8 colors
+    if (dist_c0 <= dist_c1 && dist_c0 < nearest_palette.distance) // prefer local attributes, as they have 16 not 8 colors
     {
         best = Expand(*_g.col_global0);
         code = 0b00; // code for BACKGROUND color
     }
-    else if (dist_c1 < nearest_palette.dinstance)
+    else if (dist_c1 < nearest_palette.distance)
     {
         best = Expand(color4); // *_g.col_global1);
         code = 0b10; // code for TIMEX color

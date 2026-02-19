@@ -53,10 +53,11 @@ protected:
     // rows with ULAPlus color 4
     std::vector<RGB> _color4;
 
-    void _SaveHeader(std::ofstream& of, const std::string& project) const;
-    void _Save4thColor(std::ofstream& of, const std::string& project) const;
-    void _Save0thColor(std::ofstream& of, const std::string& project) const;
+    //void _SaveHeader(std::ofstream& of, const std::string& project) const;
+    virtual void _Save4thColor(std::ofstream& of, const std::string& project) const;
+    virtual void _Save0thColor(std::ofstream& of, const std::string& project) const;
 
     virtual void PutPixel(unsigned row, unsigned col, unsigned val) override;
+    virtual std::string GetFullProjectName(const std::string& core) const;
 };
 

@@ -21,7 +21,7 @@ struct ColorInfo
 struct DistanceInfo
 {
     unsigned indx; // index of closes entry
-    int dinstance;
+    int distance;
 };
 
 

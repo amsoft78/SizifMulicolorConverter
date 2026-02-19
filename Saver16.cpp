@@ -76,7 +76,7 @@ cv::Vec3b Saver16::CodePixel(unsigned row, unsigned col,
 
     cv::Vec3b out_pixel_color = Expand(_zx_palette[zx_col]);
 
-    if (nearest_palette.dinstance < nearest_native.dinstance)
+    if (nearest_palette.distance < nearest_native.distance)
     {
         auto code = nearest_palette.indx;
         // re-code because of shifting!!!! odds/even column fours

@@ -4,14 +4,21 @@
 #include "Nearest.h"
 #include "base.h"
 #include "PaletteStatistics.h"
+#include <opencv2/imgproc.hpp>
 
 SaverHR::SaverHR()
     : Saver(nullptr)
 {
 }
 
-GlobalStat SaverHR::AnalyzeGlobal(const cv::Vec3b*, const cv::Mat&)
-{   
+GlobalStat SaverHR::AnalyzeGlobal(const cv::Vec3b*, const cv::Mat& in)
+{
+    cv::Mat img_yuv;
+    cv::cvtColor(in, img_yuv, cv::COLOR_BGR2YUV);
+    std::vector<cv::Mat> yuv;
+    cv::split(img_yuv, yuv);
+    auto mean = cv::mean(yuv[0]);
+    _mean_y = mean[0];
     return GlobalStat{};
 }
 
@@ -50,7 +57,7 @@ cv::Vec3b SaverHR::CodePixel(unsigned row, unsigned col,
 
     auto Y = 0.299 * red + 0.587 * green + 0.114 * blue;
 
-    unsigned int val = Y > 0.5 ? 1 : 0;
+    unsigned int val = Y > _mean_y ? 1 : 0;
 
     auto best = val ? cv::Vec3b{ 255, 255, 255 } : cv::Vec3b{ 0,0,0 };
  
@@ -68,16 +75,6 @@ std::set<RGB> SaverHR::UsePrevPaletteEntries(const std::vector<RGB>& /*pal_rgb*/
     return arleady_avail;
 }
 
-/*
-void Saver4::_SaveHeader(std::ofstream& of, const std::string& project) const
-{
-    of << "#define " << project << "col0 0x" << std::hex << *_g.col_global0_indx << std::endl;
-    of << "#define " << project << "rgb0 0x" << std::hex << (int)Pack(*_g.col_global0_rgb) << std::endl;
-
-    of << "extern void " << project << "_show() __banked;" << std::endl;
-    of << "extern void " << project << "_prepare_colors() __banked;" << std::endl;
-}
-*/
 void SaverHR::SaveHeader(std::ofstream& of, const std::string& project0)
 {
     std::string project = project0 + "hr";
