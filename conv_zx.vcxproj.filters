@@ -48,6 +48,9 @@
     <ClCompile Include="Saver4noUP.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SaverTMC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PaletteStatistics.h">
@@ -78,6 +81,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Saver4noUP.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SaverTMC.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

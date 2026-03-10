@@ -24,6 +24,7 @@ public:
     virtual void SaveHeader(std::ofstream& of, const std::string& project) = 0;
     virtual void SaveCFile(std::ofstream& of, const std::string& project, const std::vector<RGB>& attribs);
 
+
 protected:
     uchar* out_page0;
     uchar* out_page1;
@@ -33,7 +34,7 @@ protected:
     virtual void SavePaletteAsAtributes(std::ofstream& of,
         const std::vector<RGB>& attribs,
         const std::string& prefix) const;
-    void Save(std::ofstream& of, unsigned page) const;
+    //void Save(std::ofstream& of, unsigned page) const;
 
     void SaveScreenPage(std::ofstream& of, unsigned page) const;
 };

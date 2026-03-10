@@ -159,6 +159,7 @@
     <ClCompile Include="Saver4noUP.cpp" />
     <ClCompile Include="SaverDual.cpp" />
     <ClCompile Include="SaverHR.cpp" />
+    <ClCompile Include="SaverTMC.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="base.h" />
@@ -171,6 +172,7 @@
     <ClInclude Include="Saver4noUP.h" />
     <ClInclude Include="SaverDual.h" />
     <ClInclude Include="SaverHR.h" />
+    <ClInclude Include="SaverTMC.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

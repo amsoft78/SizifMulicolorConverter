@@ -14,10 +14,17 @@
 #include "Saver16.h"
 #include "SaverDual.h"
 #include "SaverHR.h"
+#include "SaverTMC.h"
 
 #include <optional>
 #include <bitset>
 #include "C64.h"
+
+#ifdef NDEBUG
+#define CONV_NOLOG
+#endif 
+
+#define CONV_NOLOG
 
 enum class OutputMode
 {
@@ -26,11 +33,15 @@ enum class OutputMode
     cga16,
     dual_playfield,
     timex_hr,
+    timex_mc
 };
 
 void Convert(const std::string& input_file, const std::string& project, const OutputMode output_mode)
 {
-    const auto avail_palette_16 = spectrum_more_rg;
+    const auto& avail_palette_16 =
+        output_mode == OutputMode::timex_mc 
+        ? spectrum_natives
+        : spectrum_more_rg;
     cv::Vec3b TC[16];
 
 
@@ -67,6 +78,10 @@ void Convert(const std::string& input_file, const std::string& project, const Ou
     case OutputMode::timex_hr:
         saver = std::make_unique <SaverHR>();
         output_mode_prefix = "hr";
+        break;
+    case OutputMode::timex_mc:
+        saver = std::make_unique <SaverTMC>(avail_palette_16);
+        output_mode_prefix = "tmc";
         break;
     default:
         return;
@@ -134,20 +149,21 @@ void Convert(const std::string& input_file, const std::string& project, const Ou
     unsigned cg = 0;
 
     std::vector<RGB> vec_pal;
-    vec_pal.resize(768*2);
-
+    vec_pal.resize(192 * ( ZX_SIZE_X / 8 ) * 2);
 
     cv::Mat outzx(192, ZX_SIZE_X, CV_8UC3, cv::Scalar(0, 0, 0));
 
     unsigned free_prev_palette_items{ 0 }; // if prevoius group did not generate both entries, it might be used by next group
-
-    if (saver->RowsInGroup() > 1 && saver->ColsInGroup() > 1)
+    
+    if (saver->RowsInGroup() > 1 || saver->ColsInGroup() > 1)
     for (unsigned r = 0; r < outsc.rows && r < 192; r += saver->RowsInGroup(), rg++)
     {
         cg = 0;
         for (unsigned c = 0; c < outsc.cols && c < ZX_SIZE_X; c += saver->ColsInGroup(), cg++)
         {
+#ifndef CONV_NOLOG
             std::cout << "Analyzing row group " << rg << ", column group " << cg << std::endl;
+#endif
 
             auto pal_indx_base = ((rg << 5) + cg) << 1;
 
@@ -174,6 +190,7 @@ void Convert(const std::string& input_file, const std::string& project, const Ou
                 auto is_popular = arleady_avail.find(it_s->second.rgb);
                 if (is_popular != arleady_avail.end())
                     continue;
+#ifndef CONV_NOLOG
                 std::cout << "    count: " << it_s->first
                     << ", r: " << (int)it_s->second.rgb.r
                     << ", g: " << (int)it_s->second.rgb.g
@@ -182,20 +199,25 @@ void Convert(const std::string& input_file, const std::string& project, const Ou
                     << ", COL: 0x" << ((it_s->second.rgb.g << 5) + (it_s->second.rgb.r << 2) + it_s->second.rgb.b)
                     << std::dec
                     << ", ZX color " << it_s->second.entry_indx << ", dist " << it_s->second.entry_distance;
+#endif
                 if (to_fill > 0 && !(it_s->second.entry_distance == 0 && saver->CanUseNativeZXEntry(it_s->second.entry_indx) ))
                 {
                     auto indx = pal_indx_base - free_prev_palette_items + to_fill - 1;
-                    _ASSERT(indx < 768 * 2);
                     vec_pal[indx] = it_s->second.rgb;
                     to_fill--;
+#ifndef CONV_NOLOG
                     std::cout << "*";
+#endif
                     arleady_avail.insert(it_s->second.rgb);
                     insert_cout++;
+#ifndef CONV_NOLOG
                     if (insert_cout > 2)
                         std::cout << "***";
+#endif
                 }
-
+#ifndef CONV_NOLOG
                 std::cout << std::endl;
+#endif
             }
 
             // allow use not filled entries by a next colour group
@@ -290,6 +312,8 @@ int main(int argc, char* argv[])
         output_mode = OutputMode::dual_playfield;
     else if (str_om == "hr")
         output_mode = OutputMode::timex_hr;
+    else if (str_om == "mc")
+        output_mode = OutputMode::timex_mc;
     else
     {
         std::cerr << "Output mode ca be only 4 or 16 or dual" << std::endl;

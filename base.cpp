@@ -207,8 +207,9 @@ int Dist(unsigned a0, const cv::Vec3b& b)
 
 // nearest on of 'psize' entries in palete
 // return entry, distance
-DistanceInfo  NearestPal(
-    const std::vector<RGB>& pal,
+template <typename  PEType> 
+DistanceInfo  TNearestPal(
+    const std::vector<PEType>& pal,
     unsigned start,
     unsigned psize,
     const cv::Vec3b& point)
@@ -225,6 +226,24 @@ DistanceInfo  NearestPal(
         }
     }
     return DistanceInfo{ res, min_dist };
+}
+
+DistanceInfo  NearestPal(
+    const std::vector<RGB>& pal,
+    unsigned start,
+    unsigned psize,
+    const cv::Vec3b& point)
+{
+    return TNearestPal(pal, start, psize, point);
+}
+
+DistanceInfo NearestPal(
+    const std::vector<unsigned char>& pal,
+    unsigned start,
+    unsigned psize,
+    const cv::Vec3b& point)
+{
+    return TNearestPal(pal, start, psize, point);
 }
 
 uchar spectrum_more_rg[16] = // 6080 (010 100) more R & G
@@ -246,4 +265,25 @@ uchar spectrum_more_rg[16] = // 6080 (010 100) more R & G
     0b11111011,     // 1101 
     0b11111100,     // 1110 yellow
     0b11111111,     // 1111 white
+};
+// IGRB into G3R3B2
+uchar spectrum_natives[] =
+{
+    0b00000000,     // 0000 black,
+    0b00000010,     // 0001 blue
+    0b00010100,     // 0010 red,.
+    0b00010110,     // 0011 magenta.
+    0b10100000,     // 0100 green,
+    0b10100010,     // 0101 cyan
+    0b10110100,     // 0110 yellow,.
+    0b10110110,     // 0111 white.
+    // bright
+    0b00000000,     // 1000 b_black
+    0b00000011,     // 1001 b_blue,
+    0b00011100,     // 1010 b_red.
+    0b00011111,     // 1011 b_magenta,.
+    0b11100000,     // 1100 b_green
+    0b11100011,     // 1101 b_cyan,
+    0b11111100,     // 1110 b_yellow.
+    0b11111111,     // 1111 b_white,.
 };

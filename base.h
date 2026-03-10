@@ -60,6 +60,11 @@ DistanceInfo NearestPal(
     unsigned psize,
     const cv::Vec3b& point);
 
+DistanceInfo NearestPal(
+    const std::vector<unsigned char>& pal,
+    unsigned start,
+    unsigned psize,
+    const cv::Vec3b& point);
 //palettes
 extern uchar spectrum_natives[16];
 extern uchar spectrum_more_red[16];
