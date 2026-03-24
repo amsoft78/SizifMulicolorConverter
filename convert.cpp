@@ -293,9 +293,18 @@ void Convert(const std::string& input_file, const std::string& project, const Ou
 
 int main(int argc, char* argv[])
 {
+    std::stringstream options;
+    options << "Color mode can be one of:" << std::endl;
+    options << "    mc   - Timex 2048 HiColor mode (8x1 attributes)" << std::endl;
+    options << "    hr   - Timex 2048 HiRes mode (512x192 mono)" << std::endl;
+    options << "    4    - 256x192 4 color mode with ULA+ registers" << std::endl;
+    options << "    4np  - 4 color mode, but without ULA+ registers" << std::endl;
+    options << "    16   - 128x192 16 colors mode" << std::endl;
+    options << "    dual - second playfied generation for 128x192 x 4 colors Dual Playfields mode" << std::endl;
     if (argc < 4)
     {
-        std::cerr << "Usage: " << argv[0] << " file_path project_name color mode (4 or 16)" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " file_path project_name color_mode " << std::endl;
+        std::cerr << options.str();
         return -1;
     }
 
@@ -316,7 +325,7 @@ int main(int argc, char* argv[])
         output_mode = OutputMode::timex_mc;
     else
     {
-        std::cerr << "Output mode ca be only 4 or 16 or dual" << std::endl;
+        std::cerr << options.str();
         return -1;
     }
 
